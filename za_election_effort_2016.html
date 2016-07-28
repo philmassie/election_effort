@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
 <meta charset="utf-8">
 <style>
 body {
@@ -88,75 +89,71 @@ display: inline-block;
         }
 </style>
 <body>
-<div id = "controls"></div>
-<div id = "container">
-</div>
-
-
+<div id="" style="width:620px"></div>
+    <div id = "div-controls"></div>
+    <div id = "div-map"></div>
+    <div id = "div-legend"></div>
 <script src="https://d3js.org/d3.v3.min.js"></script>
 <script src="https://d3js.org/topojson.v1.min.js"></script>
 <script src="https://d3js.org/queue.v1.min.js"></script>
 <script src="js/d3.tip.v0.6.3.js"></script>
-
 <script>
-//var metric_array = ["relative_change", "absolute_change"];	 //array of property keys
-//var metric = metric_array[0]; //initial attribute
-//var curr_party
+//var initial settings
 var init_party = "African National Congress",
     init_metric = "relative_change"
 
-var width = 570;
-var height = 502;
+//Sets map dimensions
+var margin = {top: 0, left: 0, bottom: 0, right: 0},
+    width = window.outerWidth,
+    width = width - margin.left - margin.right,
+    mapRatio = 54/62,
+    height = width * mapRatio;
+  
+//Tells the map what projection to us
+var projection = d3.geo.albers()
+    .parallels([-22.125030057999936,-34.83417000582944])
+    .center([0,0])
+    .rotate([-25,0])
+    .scale(1)
+    .translate([0, 0]);
+    
+//Tells the map how to draw the paths from the projection
+var path = d3.geo.path()
+    .projection(projection); 
 
-//create a new svg element with the above dimensions
-var map = d3.select("#container")
+//Appened svg to the map-div
+var map = d3.select("#div-map")
     .append("svg")
         .attr("id", "main-svg")
-        .attr("width", width)
-        .attr("height", height);
-        
+        .style("height", height + "px")
+        .style("width", width + "px"); 
+
+// initialise tooltip
 var tip = d3.tip()
-    .attr('class', 'd3-tip')
+    .attr("class", "d3-tip")
     .offset([-10, 0])
     .html(function(d) {
         return "<span>" + d + "</span>" ;
 })
-
 map.call(tip);
 
-var legend_svg = d3.select("#container")
+// initialise legend
+var legend_svg = d3.select("#div-legend")
     .append("svg")
         .attr("id", "legend-svg")
-        .attr('width', 55)
-        .attr('height', height)  
-
-
-        
-var projection = d3.geo.albers()
-    .parallels([-22,-35])
-    .center([0, 0])
-    .rotate([-25, 0])
-    .scale([2141])
-    .translate([293,-785]);
-
-// Create a path generator called path.
-var path = d3.geo.path()
-        .projection(projection);
-
+        .attr("width", 55)
+        .attr("height", height)  
+   
 //Reading party list and candidate data
 queue()
-    .defer(d3.csv, "d3_party_list.csv")
-    .defer(d3.csv, "d3_data_all.csv")
-    .defer(d3.json, "za_provinces.json") //load geometry
-    .defer(d3.json, "za_districts.json") //load geometry
+    .defer(d3.csv, "data/d3_party_list.csv")
+    .defer(d3.csv, "data/d3_data_all.csv")
+    .defer(d3.json, "data/za_provinces_low.json") //load geometry
+    .defer(d3.json, "data/za_districts_low.json") //load geometry
     .await(ready);
 
 function ready(error, csv_list, csv_data, topo_prov, topo_dist) {
     if (error) throw error;
-	//var p1_name = csv_list[0].Party
-    //var p1_var = csv_list[0].Party.replace(/ /g,"")
-    //console.log(csv_list)
-    //console.log(list[0].tot)
 
     // make csv numbers numeric
     csv_data.forEach(function(d) {
@@ -173,9 +170,55 @@ function ready(error, csv_list, csv_data, topo_prov, topo_dist) {
     dropdown_party(csv_list, csv_data);
     var metric_array = ["relative_change", "absolute_change"]
     dropdown_metric(metric_array, csv_data)
-
+    
     // assign topoJSON Features or FeatureCollections to variables
-    var districts = topojson.feature(topo_dist, topo_dist.objects.za_districts);            
+    var districts = topojson.feature(topo_dist, topo_dist.objects.DistrictMunicipalities2011);
+        
+    // get map bounds for map resizing [[left, top], [right, bottom]]
+    var district_bounds = path.bounds(districts);
+    var right = district_bounds[1][0],
+        left = district_bounds[0][0],
+        top = district_bounds[0][1],
+        bottom = district_bounds[1][1];
+    
+    
+    b1 = (right - left) // bound width
+    b2 = (bottom - top) // bound height
+    b3 = (right + left)
+    b4 = (bottom + top)
+    
+    // initial rezize to window dims
+    resize(b1, b2, b3, b4)
+
+    d3.select(window).on("resize", function(d) { resize(b1, b2, b3, b4) })
+    
+function resize(b1, b2, b3, b4) {
+    // Adjust height and width as window size changes
+    width = d3.select("#div-map").node().clientWidth;
+    width = width - margin.left - margin.right;
+    height = width * mapRatio;
+    
+     // Compute the bounds of districts, then derive scale & translate.
+
+    var s = .95 / Math.max(b1 / width, b2 / height),
+        t = [(width - s * b3) / 2, (height - s * b4) / 2];
+    projection
+        .translate(t)
+        .scale(s);
+
+    // resize the map container
+    map
+        .style("width", width + "px")
+        .style("height", height + "px");
+
+    // resize the map
+    map.selectAll("path").attr("d", path);
+}
+
+
+    
+
+           
 
     // Draw South Africa district geometry to map	
     // bind and fill with initial data
@@ -199,11 +242,11 @@ function ready(error, csv_list, csv_data, topo_prov, topo_dist) {
 
     // Draw boundary lines
     // provincial internal and external to country
-    var prov_internal = topojson.mesh(topo_prov, topo_prov.objects.za_provinces, function(a, b) { return a !== b; })
-    var prov_external = topojson.mesh(topo_prov, topo_prov.objects.za_provinces, function(a, b) { return a == b; })	
+    var prov_internal = topojson.mesh(topo_prov, topo_prov.objects.Province_New_SANeighbours, function(a, b) { return a !== b; })
+    var prov_external = topojson.mesh(topo_prov, topo_prov.objects.Province_New_SANeighbours, function(a, b) { return a == b; })	
     // district internal and external to provinces - not working
-    var dist_internal = topojson.mesh(topo_dist, topo_dist.objects.za_districts, function(a, b) { return a !== b; })
-    //var dist_external = topojson.mesh(za_dist_data, za_dist_data.objects.za_districts, function(a, b) { alert(a.PROVNAME) })
+    var dist_internal = topojson.mesh(topo_dist, topo_dist.objects.DistrictMunicipalities2011, function(a, b) { return a !== b; })
+    //var dist_external = topojson.mesh(za_dist_data, za_dist_data.objects.DistrictMunicipalities2011, function(a, b) { alert(a.PROVNAME) })
 
     /*var dist_external_line = map.append("path")
         .datum(dist_external)
@@ -234,7 +277,7 @@ function ready(error, csv_list, csv_data, topo_prov, topo_dist) {
 // =========
 function update_legend(data){
 
-    legend_svg.selectAll('*').remove();
+    legend_svg.selectAll("*").remove();
     
     //Append a defs (for definition) element to your SVG
     var defs = legend_svg.append("defs");
@@ -398,7 +441,7 @@ function update_map(new_arr_data){
 
 // DROPDOWNS
 function dropdown_party(csv_list, csv_data){
-    var dd_party = d3.select("#controls")
+    var dd_party = d3.select("#div-controls")
         .append("div")
             .attr("class","dd_party") //for positioning menu with css
             .html("<h3>Select a party:</h3>")
@@ -422,7 +465,7 @@ function dropdown_party(csv_list, csv_data){
 };    
 
 function dropdown_metric(metric_array, csv_data){
-    var dd_metric = d3.select("#controls")
+    var dd_metric = d3.select("#div-controls")
         .append("div")
             .attr("class","dd_metric") //for positioning menu with css
             .html("<h3>Select metric:</h3>")
