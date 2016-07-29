@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<html lang="en">
 <style>
 body {
     font: 11pt sans-serif;
@@ -88,15 +88,24 @@ li.key {
 <body>
 
 
-<div id="" style="width:620px"></div>
+<div class = "container" >
     <div id = "div-controls"></div>
     <div id = "div-map"></div>
     <div id = "div-legend"></div>
+</div>
 <script src="https://d3js.org/d3.v3.min.js"></script>
 <script src="https://d3js.org/topojson.v1.min.js"></script>
 <script src="https://d3js.org/queue.v1.min.js"></script>
 <script src="js/d3.tip.v0.6.3.js"></script>
 <script src="js/colorbrewer.js"></script>
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
 
 <script>
 //Globals
@@ -551,3 +560,5 @@ function out(d) {
             .style("opacity", 0.8);
   };
 </script>
+</body>
+</html>
