@@ -1,0 +1,9 @@
+git add .
+git status
+git commit -m 'I think most of the responsiveness might work. nearly there'
+git push origin master
+
+git checkout gh-pages
+git rebase master
+git push origin gh-pages
+git checkout master

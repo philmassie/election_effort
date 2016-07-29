@@ -103,14 +103,9 @@ var init_party = "African National Congress",
 //Sets map dimensions
 var margin = {top: 0, left: 0, bottom: 0, right: 0},
     width = window.outerWidth - margin.left - margin.right,
-    height = window.outerHeight - margin.top - margin.bottom,
     mapRatio = 54/62;
-
-if (width > height){
-    width = height * (1/mapRatio)
-}else if (height > width){
     height = width * mapRatio
-}
+
   
 //Tells the map what projection to us
 var projection = d3.geo.albers()
@@ -257,15 +252,8 @@ function resize(b1, b2, b3, b4) {
     // Adjust height and width as window size changes
     var margin = {top: 0, left: 0, bottom: 0, right: 0},
         width = window.outerWidth - margin.left - margin.right,
-        height = window.outerHeight - margin.top - margin.bottom-280,
         mapRatio = 54/62;
-
-    if (width > height){
-        width = height * (1/mapRatio)
-    }else if (height > width){
         height = width * mapRatio
-    }
-    
      // Compute the bounds of districts, then derive scale & translate.
 
     var s = .95 / Math.max(b1 / width, b2 / height),
