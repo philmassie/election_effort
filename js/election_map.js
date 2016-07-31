@@ -37,9 +37,9 @@ var tip_circle = map.append("circle")
     .attr("id", "tip-circle")
     .attr("cx", 0)
     .attr("cy", 0)
-    .attr("r", 10)
+    .attr("r", 0)
     .attr("fill", "green")
-    .style("opacity", 1);  
+    .style("opacity", 0);  
 
 // initialise tooltip
 var tip = d3.tip()
