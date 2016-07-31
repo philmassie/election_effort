@@ -1,6 +1,6 @@
 git add .
 git status
-git commit -m 'I think most of the responsiveness might work. nearly there'
+git commit -m 'whoos, updated iframelink'
 git push origin master
 
 git checkout gh-pages
