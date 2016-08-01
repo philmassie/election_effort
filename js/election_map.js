@@ -52,8 +52,13 @@ var tip = d3.tip()
 map.call(tip);
 
 // set legend dims
-var leg_width = 320,
-    leg_height = 55;
+if (width < 400) {
+    var leg_width = width - 15;
+} else {
+    var leg_width = 400;
+}
+var leg_height = 55;
+
 // initialise legend
 var legend_svg = d3.select(".div-svg")
     .append("svg")
