@@ -4,6 +4,9 @@ body {
 .container {
     max-width:700px;
 }
+#election-header {
+    margin: 0px 0 0px;
+}
 .col-select {
 padding-bottom: 5px;
 
