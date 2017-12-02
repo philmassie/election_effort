@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<body>
+blah blah blah
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script src="http://d3js.org/queue.v1.min.js"></script>
+<script>
+var metric_array = ["relative_change", "absolute_change"];	 //array of property keys
+var metric = metric_array[0]; //initial attribute
+var curr_party_data
+
+
+
+
+//Reading party list and candidate data
+queue()
+    .defer(d3.csv, "d3_party_list.csv")
+    .defer(d3.csv, "d3_data_all.csv")
+    .defer(d3.json, "za_provinces.json") //load geometry
+    .defer(d3.json, "za_districts.json") //load geometry
+    .await(ready);
+
+function ready(error, csv_list, csv_data, topo_prov, topo_dist) {
+	//var p1_name = list[0].Party
+    //var p1_var = list[0].Party.replace(/ /g,'')
+    // console.log(p1_var)
+    // console.log(list[0].tot)
+
+    //make new array from csv
+	/*
+    list.forEach(function (d) {
+		rateById[d.Party] = +d.tot;
+		//nameById[d.RegionCode] = d.RegionName;
+	});
+    */
+    
+    curr_party_data = get_party_data(csv_data);
+    
+    //console.log(curr_party_data)
+    
+    dropdown_party(csv_list, csv_data);
+    dropdown_metric(csv_list, curr_party_data)
+    
+    
+    
+
+
+}
+
+// FUNCTIONS
+function get_party_data(csv_data, party = "African National Congress"){
+    //console.log(party)
+    //console.log(csv_data)
+    curr_party_data = csv_data.filter(function(row) {
+        return row['Party'] == party;
+    })
+    metric_to_district(curr_party_data, metric)
+    //return(curr_party_data);
+    //run functions to update colours now
+    
+};
+
+function metric_to_district(curr_party_data, metric){
+    console.log(curr_party_data)
+    console.log(metric)
+};
+
+function dropdown_party(csv_list, csv_data){
+    //console.log(csv_list)
+    //add a select element for the dropdown menu
+    var dd_party = d3.select("body")
+        .append("div")
+            .attr("class","dropdown") //for positioning menu with css
+            .html("<h3>Select a party:</h3>")
+        .append("select")
+    
+    dd_party
+        .on("change", function(){
+            //alert(d3.select(this).property("value"))
+            get_party_data(csv_data, d3.select(this).property("value"));
+        });
+        
+    dd_party.selectAll("options")
+        .data(csv_list)
+        .enter()
+            .append("option")
+            .attr("value", function(d){ return d.Party })
+            .text(function(d){ return d.Party })
+};    
+
+function dropdown_metric(csv_list){
+    //add a select element for the dropdown menu
+    var dd_metric = d3.select("body")
+        .append("div")
+        .attr("class","dd_metric") //for positioning menu with css
+        .html("<h3>Select metric:</h3>")
+        .append("select")
+    dd_metric
+        .on("change", function(){
+            metric = this.value;
+            //changeAttribute(this.value, csv_list);
+            //change_metric(this.value, csv_list);
+            metric_to_district(curr_party_data, metric)
+        });
+
+    //create each option element within the dropdown
+    dd_metric.selectAll("options")
+        .data(metric_array)
+        .enter()
+        .append("option")
+        .attr("value", function(d){ return d })
+        .text(function(d) {return d.replace(/_/g,' ')});
+};
+</script>

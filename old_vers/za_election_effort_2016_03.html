@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta charset="utf-8">
+<style>
+body {
+  font: 12px sans-serif;
+}
+.dd_party{
+display: inline-block;
+}
+.dd_metric{
+display: inline-block;
+}
+.districts {
+    fill: none;
+}
+
+.dist_external{
+
+}
+
+.dist_internal{
+    fill: none;
+    stroke: #f2f2f2;
+    stroke-linejoin: round;  
+    stroke-width: 0.8;
+}
+
+.prov_external{
+    fill: none;
+    stroke: #053061;
+    stroke-linejoin: round;
+    stroke-width: 1;
+}
+
+.prov_internal{
+    fill: none;
+    stroke: #1a1a1a;
+    stroke-linejoin: round;
+    stroke-width: 1;
+}
+.d3-tip h3{
+    margin: 0;
+    margin-bottom: 5px;
+    padding: 0;
+    display: inline-block;
+
+}
+.d3-tip {
+  line-height: 1;
+  font-weight: bold;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 2px;
+}
+.infolabel {
+    position: absolute;
+    width: 400px;
+    height: 100px;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.5);;
+    border: solid thin #fff;
+    padding: 5px;
+}
+
+.infolabel h3 {
+    margin: 0;
+    padding: 0;
+    display: inline-block;
+    line-height: 1em;
+}
+
+.infolabel b {
+    float: left;
+}
+
+.axis text {
+    font: 12px sans-serif;
+}
+
+.axis line, .axis path {
+    fill: none;
+    stroke: #000;
+    shape-rendering: crispEdges;
+}
+        #legend-svg {
+            vertical-align: top;
+        }
+</style>
+<body>
+<div id = "controls"></div>
+<div id = "container">
+</div>
+
+
+<script src="https://d3js.org/d3.v3.min.js"></script>
+<script src="https://d3js.org/topojson.v1.min.js"></script>
+<script src="https://d3js.org/queue.v1.min.js"></script>
+<script src="js/d3.tip.v0.6.3.js"></script>
+
+<script>
+//var metric_array = ["relative_change", "absolute_change"];	 //array of property keys
+//var metric = metric_array[0]; //initial attribute
+//var curr_party
+var init_party = "African National Congress",
+    init_metric = "relative_change"
+
+var width = 570;
+var height = 502;
+
+//create a new svg element with the above dimensions
+var map = d3.select("#container")
+    .append("svg")
+        .attr("id", "main-svg")
+        .attr("width", width)
+        .attr("height", height);
+        
+var tip = d3.tip()
+    .attr('class', 'd3-tip')
+    .offset([-10, 0])
+    .html(function(d) {
+        return "<span>" + d + "</span>" ;
+})
+
+map.call(tip);
+
+var legend_svg = d3.select("#container")
+    .append("svg")
+        .attr("id", "legend-svg")
+        .attr('width', 55)
+        .attr('height', height)  
+
+
+        
+var projection = d3.geo.albers()
+    .parallels([-22,-35])
+    .center([0, 0])
+    .rotate([-25, 0])
+    .scale([2141])
+    .translate([293,-785]);
+
+// Create a path generator called path.
+var path = d3.geo.path()
+        .projection(projection);
+
+//Reading party list and candidate data
+queue()
+    .defer(d3.csv, "d3_party_list.csv")
+    .defer(d3.csv, "d3_data_all.csv")
+    .defer(d3.json, "za_provinces_low.json") //load geometry
+    .defer(d3.json, "za_districts_low.json") //load geometry
+    .await(ready);
+
+function ready(error, csv_list, csv_data, topo_prov, topo_dist) {
+    if (error) throw error;
+	//var p1_name = csv_list[0].Party
+    //var p1_var = csv_list[0].Party.replace(/ /g,"")
+    //console.log(csv_list)
+    //console.log(list[0].tot)
+
+    // make csv numbers numeric
+    csv_data.forEach(function(d) {
+    d.pr_cand_2016_num = +d.pr_cand_2016_num;
+    d.relative_change = (+d.relative_change * 100).toFixed(2);
+    d.absolute_change = +d.absolute_change;
+    d.MapNo = +d.MapNo;
+    });
+    
+    // get initial data
+    init_data = get_new_data(csv_data);
+    
+    // place the two dropdowns
+    dropdown_party(csv_list, csv_data);
+    var metric_array = ["relative_change", "absolute_change"]
+    dropdown_metric(metric_array, csv_data)
+
+    // assign topoJSON Features or FeatureCollections to variables
+    var districts = topojson.feature(topo_dist, topo_dist.objects.za_districts);            
+
+    // Draw South Africa district geometry to map	
+    // bind and fill with initial data
+    map.append("g")
+        .selectAll("path")
+        .data(districts.features)
+        .enter()
+            .append("path")
+                .attr("class", "districts")
+                .attr("id", function(d) { return d.properties.DISTRICT })
+                .attr("party", init_data.name)
+                .attr("province", function(d) { return d.properties.PROVNAME; })
+                .attr("district", function(d) { return d.properties.MUNICNAME; })
+                .attr("metric", init_data.metric)
+                .attr("delta", function(d) { return init_data.data[d.properties.DISTRICT]; })
+                .attr("d", path)
+                .style("fill", function(d) { return init_data.colscale(init_data.data[d.properties.DISTRICT]); })
+                .style("opacity", 0.8)
+                .on("mouseover", over)
+                .on("mouseout", out)
+
+    // Draw boundary lines
+    // provincial internal and external to country
+    var prov_internal = topojson.mesh(topo_prov, topo_prov.objects.za_provinces, function(a, b) { return a !== b; })
+    var prov_external = topojson.mesh(topo_prov, topo_prov.objects.za_provinces, function(a, b) { return a == b; })	
+    // district internal and external to provinces - not working
+    var dist_internal = topojson.mesh(topo_dist, topo_dist.objects.za_districts, function(a, b) { return a !== b; })
+    //var dist_external = topojson.mesh(za_dist_data, za_dist_data.objects.za_districts, function(a, b) { alert(a.PROVNAME) })
+
+    /*var dist_external_line = map.append("path")
+        .datum(dist_external)
+        .attr("d", path)
+        .attr("class", "dist_external"); */ 
+
+    var dist_internal_line = map.append("path")
+        .datum(dist_internal)
+        .attr("d", path)
+        .attr("class", "dist_internal");       
+
+    var prov_internal_line = map.append("path")
+        .datum(prov_internal)
+        .attr("d", path)
+        .attr("class", "prov_internal");
+        
+    var prov_external_line = map.append("path")
+        .datum(prov_external)
+        .attr("d", path)
+        .attr("class", "prov_external");            
+
+        
+           
+
+}
+
+// FUNCTIONS
+// =========
+function update_legend(data){
+
+    legend_svg.selectAll('*').remove();
+    
+    //Append a defs (for definition) element to your SVG
+    var defs = legend_svg.append("defs");
+    //Append a linearGradient element to the defs and give it a unique id
+    var legend = defs.append("linearGradient")
+        .attr("id", "linear-gradient")
+        .attr("x1", "0%")
+        .attr("y1", "0%")
+        .attr("x2", "0%")
+        .attr("y2", "100%");
+        
+    // Assign colour ranges and number domains
+    if (data.data_min < 0 && data.data_max > 0){ var two_sided = true }
+    if (data.data_min < 0 && data.data_max <= 0){ var lower = true }
+    if (data.data_min >= 0 && data.data_max > 0){ var upper = true }
+    if (two_sided){
+        var col_range = data.colscale.range().reverse()
+        var num_domain = data.colscale.domain() 
+    }else if (lower) {
+        var col_range = ([data.colscale(data.data_max - 0.0000001), data.colscale(data.data_min)]) // data.colscale(data.data_min) erring on red side
+        var num_domain = [data.data_max, data.data_min]
+    }else if (upper) {
+        var col_range = ([data.colscale(data.data_max), data.colscale(data.data_min + 0.0000001)]) // data.colscale(data.data_min) erring on red side
+        var num_domain = [data.data_max, data.data_min]
+    }
+
+    //Append multiple color stops by using D3"s data/enter step
+    legend.selectAll("stop") 
+        .data(col_range)                  
+        .enter().append("stop")
+        .attr("offset", function(d,i) { // think about how to scale this more nicely
+            if (two_sided){
+                if (i == 0 || i == 3) {
+                    return i/(col_range.length-1);
+                } else {
+                    return 0.5
+                }
+            }else{
+                return i/(col_range.length-1);
+            }
+        }) 
+        //.attr("offset", function(d,i) { return i/(col_range.length-1); }) // causing 0, 1/3, 2/3, 1
+        .attr("stop-color", function(d) { return d; });
+        
+    var size_pos = { width: 20, height: height-40, dx: 0, dy: 20 }
+    //Draw the rectangle and fill with gradient
+    legend_svg.append("rect")
+        .attr("width", size_pos.width)
+        .attr("height", size_pos.height)
+        .style("fill", "url(#linear-gradient)")
+        .attr("transform", "translate(" + size_pos.dx + "," + size_pos.dy + ")");
+    
+    // Y axis number scaling
+    if (two_sided){
+        var y = d3.scale.linear()
+            .range([size_pos.height, size_pos.height/2, size_pos.height/2, 0])
+            .domain(num_domain);
+    }else{
+        var y = d3.scale.linear()
+            .range([0, size_pos.height])
+            .domain(num_domain);
+    }
+
+    // build y axis
+    if (two_sided){
+        var yAxis = d3.svg.axis()
+            .scale(y)
+            .orient("right")
+            .tickValues([data.data_min, 0, data.data_max]);
+    }else{
+        var yAxis = d3.svg.axis()
+            .scale(y)
+            .orient("right")
+            .tickValues([data.data_min, data.data_max]);
+    }
+
+    if (data.metric == "relative_change"){
+        axis_title = "Relative change in PR Representatives (%)"
+    }else{
+        axis_title = "Absolute change in PR Representatives (numbers of individuals)"
+    }
+    // append legend axis
+	legend_svg.append("g")
+        .attr("class", "y axis")
+        .attr("transform", "translate(" + size_pos.width + "," + size_pos.dy + ")")
+        .call(yAxis)
+        .append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("x", -10)
+            .attr("y", 30)
+            .style("text-anchor", "end")
+            .text(axis_title);
+ }
+// COLORS
+// build a colour scale
+function colour_scale(csv_data, metric){
+    //console.log(csv_data)
+    var min = d3.min(csv_data, function(d) { return +d[metric]; }),
+        mid_l = "0",
+        mid_h = "0",
+        max = d3.max(csv_data, function(d) { return +d[metric]; }),
+        mincol = "#053061",
+        midcol_l = "#b6d6fb",
+        midcol_h = "#ffccd8",
+        maxcol = "#a50026"
+        
+    var color = d3.scale.linear()
+        .domain([min, mid_l, mid_h, max])
+        .range([mincol, midcol_l, midcol_h, maxcol]);
+    //console.log(color(max))
+    return color;	 //return the color scale generator
+}; 
+
+// DATA
+function get_new_data(csv_data, new_party = init_party, new_metric = init_metric){
+    // Subset the main data to include only the required party
+    csv_data_sub = csv_data.filter(function(row) {
+        return row["Party"] == new_party;
+    })
+    
+    // generate an array of district codes and their metric
+    var pdata = {};
+    csv_data_sub.forEach(function(d) {
+        pdata[d.dist_code] = +d[new_metric]
+    });
+    
+    // combine data into new data set
+    var arr_party = {
+        name: new_party,
+        metric: new_metric,
+        data: pdata,
+        data_min: d3.min(csv_data_sub, function(d) { return +d[new_metric]; }),
+        data_max: d3.max(csv_data_sub, function(d) { return +d[new_metric]; }),
+        colscale: colour_scale(csv_data_sub, new_metric),
+    }
+    
+    // update map
+    update_map(arr_party)
+    // update legend
+    update_legend(arr_party)
+    
+    return(arr_party)
+};
+
+function update_map(new_arr_data){
+    //recolor the map and bind new data
+    d3.selectAll(".districts") //select every region
+        .style("fill", function(d) { //color enumeration units
+            if (new_arr_data.data[d.properties.DISTRICT]) {
+                return new_arr_data.colscale(new_arr_data.data[d.properties.DISTRICT]);
+            } else {
+                return "white";
+            }
+        })
+        .attr("party", new_arr_data.name)
+        .attr("province", function(d) { return d.properties.PROVNAME; })
+        .attr("district", function(d) { return d.properties.MUNICNAME; })
+        .attr("metric", new_arr_data.metric)
+        .attr("delta", function(d) { return new_arr_data.data[d.properties.DISTRICT]; })
+};
+
+// DROPDOWNS
+function dropdown_party(csv_list, csv_data){
+    var dd_party = d3.select("#controls")
+        .append("div")
+            .attr("class","dd_party") //for positioning menu with css
+            .html("<h3>Select a party:</h3>")
+            .append("select")
+                .attr("id", "dd_party")
+    dd_party
+        .on("change", function(){
+            var sel_party = d3.select(this).property("value");
+            var sel_metric = d3.select("#dd_metric").property("value");
+            get_new_data(csv_data, new_party = sel_party, metric = sel_metric);
+        });
+    dd_party
+        .selectAll("options")
+            .data(csv_list)
+            .enter()
+                .append("option")
+                .attr("value", function(d){ return d.Party })
+                .property("selected", function(d){return d.Party == init_party})
+                .text(function(d){ return d.Party });
+                
+};    
+
+function dropdown_metric(metric_array, csv_data){
+    var dd_metric = d3.select("#controls")
+        .append("div")
+            .attr("class","dd_metric") //for positioning menu with css
+            .html("<h3>Select metric:</h3>")
+            .append("select")
+                .attr("id", "dd_metric")
+    dd_metric
+        .on("change", function(){
+            var sel_party = d3.select("#dd_party").property("value");
+            var sel_metric = this.value;
+            get_new_data(csv_data, new_party = sel_party, metric = sel_metric);
+        });
+    dd_metric.selectAll("options")
+        .data(metric_array)
+        .enter()
+            .append("option")
+            .attr("value", function(d){ return d })
+            .property("selected", function(d){return d == init_metric})
+            .text(function(d) {return d.replace(/_/g," ")});
+};
+
+// MOUSE EVENTS
+function over(d) {
+    var dist_id = "#" + d.properties.DISTRICT
+    if (d3.select(dist_id).attr("delta")){
+        d3.select(this)
+            .transition()
+                .duration(300)
+                .style("opacity", 1);
+
+        var party = d3.select(dist_id).attr("party")
+        var province = d3.select(dist_id).attr("province")
+        var district = d3.select(dist_id).attr("district")
+        var metric = d3.select(dist_id).attr("metric")
+        if (metric == "relative_change"){
+            var delta = d3.select(dist_id).attr("delta") + "%"
+        }else{
+            var delta = d3.select(dist_id).attr("delta")
+        }
+        
+        var labelAttribute = "<h3>" + party + "</h3><br>" + 
+            "<b>Province:</b>&nbsp" + province + "<br>" +
+            "<b>Municipality/district:</b>&nbsp" + district + "<br>" +
+            "<b>Metric:</b>&nbsp" + metric.replace(/_/g," ") + "<br>" +
+            "<b>Change:</b>&nbsp" + delta + ""; //label content
+        tip.show(labelAttribute)
+        }
+  };
+
+function out(d) {
+    tip.hide()
+    d3.select(this)
+        .transition()
+            .duration(300)
+            .style("opacity", 0.8);
+  };
+</script>

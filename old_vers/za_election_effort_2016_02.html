@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+svg {
+    position: absolute;
+}
+.districts {
+    fill: none;
+}
+
+.dist_external{
+
+}
+
+.dist_internal{
+    fill: none;
+    stroke: #f2f2f2;
+    stroke-linejoin: round;  
+    stroke-width: 0.8;
+}
+
+.prov_external{
+    fill: none;
+    stroke: #1a1a1a;
+    stroke-linejoin: round;
+    stroke-width: 1;
+}
+
+.prov_internal{
+    fill: none;
+    stroke: #1a1a1a;
+    stroke-linejoin: round;
+    stroke-width: 1;
+}
+
+
+.infolabel {
+    position: absolute;
+    width: 400px;
+    height: 80px;
+    color: #fff;
+    background-color: rgba(0, 0, 0, 0.5);;
+    border: solid thin #fff;
+    padding: 5px;
+}
+
+.infolabel h1 {
+    margin: 0;
+    padding: 0;
+    display: inline-block;
+    line-height: 1em;
+}
+
+.infolabel b {
+    float: left;
+}
+
+.axis text {
+    font: 10px sans-serif;
+}
+
+.axis line, .axis path {
+    fill: none;
+    stroke: #000;
+    shape-rendering: crispEdges;
+}
+</style>
+<body>
+blah blah blah
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script src="http://d3js.org/queue.v1.min.js"></script>
+<script>
+var metric_array = ["relative_change", "absolute_change"];	 //array of property keys
+var metric = metric_array[0]; //initial attribute
+var curr_party_data
+
+//Reading party list and candidate data
+queue()
+    .defer(d3.csv, "d3_party_list.csv")
+    .defer(d3.csv, "d3_data_all.csv")
+    .defer(d3.json, "za_provinces.json") //load geometry
+    .defer(d3.json, "za_districts.json") //load geometry
+    .await(ready);
+
+function ready(error, csv_list, csv_data, topo_prov, topo_dist) {
+    if (error) throw error;
+	//var p1_name = csv_list[0].Party
+    //var p1_var = csv_list[0].Party.replace(/ /g,'')
+    //console.log(csv_list)
+    //console.log(list[0].tot)
+
+    //make new array from csv
+	/*
+    list.forEach(function (d) {
+		rateById[d.Party] = +d.tot;
+		//nameById[d.RegionCode] = d.RegionName;
+	});
+*/
+
+ 
+    // make csv numners numeric
+    csv_data.forEach(function(d) {
+    d.pr_cand_2016_num = +d.pr_cand_2016_num;
+    d.relative_change = +d.relative_change;
+    d.absolute_change = +d.absolute_change;
+    d.MapNo = +d.MapNo;
+    });
+    
+    /*
+    // nest the data by party name
+    var data_new=d3.nest()
+        .key(function(d) {return d.Party;})
+        .sortKeys(d3.ascending)
+        .entries(csv_data);
+        
+    console.log(data_new[0].key)
+    */
+    
+    curr_party_data = get_party_data(csv_data);
+
+    var dist_drelative = {};
+    var dist_dabsolute = {};
+
+    curr_party_data.forEach(function(d) {
+        dist_drelative[d.dist_code] = +d.relative_change;
+        dist_dabsolute[d.dist_code] = +d.absolute_change;
+    });
+
+    //console.log(dist_drelative)
+    //console.log(dist_dabsolute)
+    //console.log(curr_party_data)
+    
+    dropdown_party(csv_list, csv_data);
+    dropdown_metric()
+    
+    var width = 800;
+    var height = 700;
+
+    /*
+    var labelAttribute = "<b>Party: </b><br>" +
+        "<b>Province: </b><br>" +
+        "<b>Municipality/district: </b><br>" +
+        "<b>Change: </b>"; //label content
+
+    //create info label div
+    var infolabel = d3.select("body").append("div")
+        .attr("class", "infolabel") //for styling label
+        .attr("id", "label") //for label div
+        .html(labelAttribute); //add text
+    */
+    
+    //create a new svg element with the above dimensions
+    var map = d3.select("body")
+        .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+    
+    
+    
+    
+    // Add legend
+
+    //Append a defs (for definition) element to your SVG
+    var defs = map.append("defs");
+
+    //Append a linearGradient element to the defs and give it a unique id
+    var legend = defs.append("linearGradient")
+        .attr("id", "linear-gradient")
+        .attr("x1", "0%")
+        .attr("y1", "0%")
+        .attr("x2", "0%")
+        .attr("y2", "100%");
+
+    var data_range = colour_scale(curr_party_data).range()
+    var data_domain = colour_scale(curr_party_data).domain()  
+
+    //Append multiple color stops by using D3's data/enter step
+    legend.selectAll("stop") 
+        .data(data_range)                  
+        .enter().append("stop")
+        .attr("offset", function(d,i) { // think about how to scale this more nicely
+            if (i == 0 || i == 3) {
+                return i/(data_range.length-1);
+            } else {
+                return 0.5
+            }
+        }) 
+        //.attr("offset", function(d,i) { return i/(data_range.length-1); }) // causing 0, 1/3, 2/3, 1
+        .attr("stop-color", function(d) { return d; });
+        
+    var gradient_specs = { width: 40, height: 200, dx: 719, dy: 450 }
+    //Draw the rectangle and fill with gradient
+    map.append("rect")
+        .attr("width", gradient_specs.width)
+        .attr("height", gradient_specs.height)
+        .style("fill", "url(#linear-gradient)")
+        .attr("transform", "translate(" + gradient_specs.dx + "," + gradient_specs.dy + ")");
+    
+    // this is for y axis of legend. must use same logic to make colours scale better.
+	var y = d3.scale.linear()
+        .range([gradient_specs.height, gradient_specs.height/2, gradient_specs.height/2, 0])
+        .domain(data_domain);
+        //.domain(function(d) { return colour_scale(curr_party_data).domain() ;});
+
+	var yAxis = d3.svg.axis().scale(y).orient("right");
+
+	map.append("g")
+    .attr("class", "y axis")
+    .attr("transform", "translate(760,450)")
+    .call(yAxis)
+    .append("text")
+    .attr("transform", "rotate(-90)")
+    .attr("y", 30)
+    .attr("dy", ".71em")
+    .style("text-anchor", "end")
+    .text("axis title");
+        
+    
+
+
+
+        
+        
+
+    // variables for csv to json data transfer
+//    var districts_data = topo_dist.objects.za_districts.geometries;		
+    // assign topoJSON Features or FeatureCollections to variables
+    // var provinces = topojson.feature(topo_prov, topo_prov.objects.za_provinces);
+    var districts = topojson.feature(topo_dist, topo_dist.objects.za_districts);            
+
+    // -- Start Projection --
+    // I thinik most of this can go outside
+    // Projection math is based on TopoJSON feature extents so it comes here
+
+    // using SA Albers equal area projection for Africa
+    var Proj4_string = "+proj=aea +lat_1=20 +lat_2=-23 +lat_0=0 +lon_0=25 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs";
+    var Proj4 = proj_vals(Proj4_string);
+
+    // SA Albers values are for entire continent so update Proj4 parallel values to 
+    // north and sounth bounds of TopoJSON feature (SA districts).
+    // alert("BL:" + d3.geo.bounds(districts)[0] + " \nTR: " + d3.geo.bounds(districts)[1])
+    var b = d3.geo.bounds(districts);
+    var p = [b[1][1], b[0][1]];
+    //var c = [0, b[1][1] - b[0][1]]; // not quite figured out yet
+    //var r = [b[1][0] - b[0][0], 0]; // not quite figured out yet
+
+    var projection = d3.geo.albers()
+        .parallels(p)
+        //.parallels(Proj4.p)
+        .center(Proj4.c)
+        .rotate(Proj4.r)
+        .scale(1)
+        .translate([0, 0]);
+
+    // Create a path generator called path.
+    var path = d3.geo.path()
+        .projection(projection);
+
+    // Compute the bounds of districts, then derive scale & translate.
+    var b = path.bounds(districts),
+        s = .95 / Math.max((b[1][0] - b[0][0]) / width, (b[1][1] - b[0][1]) / height),
+        t = [(width - s * (b[1][0] + b[0][0])) / 2, (height - s * (b[1][1] + b[0][1])) / 2];
+
+    // Update the projection to use computed scale & translate.
+    projection
+        .scale(s)
+        .translate(t);
+        
+    // -- End Projection --
+    
+    
+    
+    //add South Africa district geometry to map	
+    //console.log(curr_party_data)
+    
+    // generate a function for finding district colurs
+    var recolour_map = colour_scale(curr_party_data);
+    
+    
+
+        
+        
+    
+    
+    
+    //console.log(recolour_map)
+    //add districts to map as enumeration units colored by data
+    
+    
+    /*
+    var dist_mapped = map.selectAll(".regions")
+        .data(districts.features)
+        .enter() //create elements
+        .append("path") //append elements to svg
+        .attr("class", "districts") //assign class for additional styling
+        .attr("id", function(d) { return d.properties.DISTRICT }) // use DISTRICT to identify
+        .attr("d", path) //project data as geometry in svg
+        .style("fill", function(d) { //color enumeration units
+            return choropleth(d, recolour_map);
+            })
+        .style("opacity", 0.8)
+        .on("mouseover", over)
+        .on("mouseout", out)
+        .append("desc") //append the current color
+            .text(function(d) {
+                return choropleth(d, recolour_map);		 	
+        });    
+    
+    */
+      //Drawing Choropleth
+
+      map.append("g")
+      .selectAll("path")
+      .data(districts.features)
+      .enter()
+      .append("path")
+      .attr("class", "districts")
+      .attr("d", path)
+      .style("fill", function(d) {
+        //return choropleth(d, recolour_map); 
+        return recolour_map(dist_drelative[d.properties.DISTRICT]); 
+      })
+      .style("opacity", 0.8)
+
+      //Adding mouseevents
+      .on("mouseover", function(d) {
+        d3.select(this).transition().duration(300).style("opacity", 1);
+      })
+      .on("mouseout", function() {
+        d3.select(this)
+        .transition().duration(300)
+        .style("opacity", 0.8);
+      })
+      .append("desc") //append the current color
+            .text(function(d) {
+                return choropleth(d, recolour_map);		 	
+        });  
+    
+    
+    
+    // Draw boundary lines
+    // provincial internal and external to country
+    var prov_internal = topojson.mesh(topo_prov, topo_prov.objects.za_provinces, function(a, b) { return a !== b; })
+    var prov_external = topojson.mesh(topo_prov, topo_prov.objects.za_provinces, function(a, b) { return a == b; })	
+    // district internal and external to provinces - not working
+    var dist_internal = topojson.mesh(topo_dist, topo_dist.objects.za_districts, function(a, b) { return a !== b; })
+    //var dist_external = topojson.mesh(za_dist_data, za_dist_data.objects.za_districts, function(a, b) { alert(a.PROVNAME) })
+
+    /*var dist_external_line = map.append("path")
+        .datum(dist_external)
+        .attr("d", path)
+        .attr("class", "dist_external"); */ 
+
+    var dist_internal_line = map.append("path")
+        .datum(dist_internal)
+        .attr("d", path)
+        .attr("class", "dist_internal");       
+
+    var prov_internal_line = map.append("path")
+        .datum(prov_internal)
+        .attr("d", path)
+        .attr("class", "prov_internal");
+        
+    var prov_external_line = map.append("path")
+        .datum(prov_external)
+        .attr("d", path)
+        .attr("class", "prov_external");            
+
+}
+
+// FUNCTIONS
+//legend
+function update_colour_scale(){
+
+}
+
+// return the appropriate colour for the district
+function choropleth(d, recolour_map){
+
+    
+
+
+
+    // get topojson district code
+    var topo_dist = d.properties["DISTRICT"]
+    //console.log("topo dist: " + topo_dist)
+    
+    // get change metric value where the district codes match
+    try {
+        var change_val = curr_party_data.filter(function(d) {
+            return d['dist_code'] == topo_dist;
+            })[0][metric]; 
+    }catch(e){
+        var change_val = "0"
+    }
+    
+    //console.log(change_val)
+
+    //if value exists, assign it a color; otherwise assign gray
+    if (change_val) {
+        //alert(value);
+        return recolour_map(change_val);
+    } else {
+        return "#ccc";
+    };
+    
+    
+}; 
+
+
+// build a colour scale
+function colour_scale(csv_data){
+    //console.log(csv_data)
+    var min = d3.min(csv_data, function(d) { return +d[metric]; }),
+        mid_l = "0",
+        mid_h = "0",
+        max = d3.max(csv_data, function(d) { return +d[metric]; }),
+        mincol = "#053061",
+        midcol_l = "#b6d6fb",
+        midcol_h = "#ffccd8",
+        maxcol = "#a50026"
+        
+    var color = d3.scale.linear()
+        .domain([min, mid_l, mid_h, max])
+        .range([mincol, midcol_l, midcol_h, maxcol]);
+    //console.log(color(max))
+    return color;	 //return the color scale generator
+}; 
+
+// look at d3.nested sometime
+function get_party_data(csv_data, party = "African National Congress"){
+    //console.log(csv_data)
+    //console.log(party)
+
+    curr_party_data = csv_data.filter(function(row) {
+        return row['Party'] == party;
+    })
+
+    //console.log(curr_party_data)
+    update_fills()
+    return(curr_party_data);
+    //run functions to update colours now
+};
+
+function metric_to_district(curr_party_data, metric){
+    //console.log(curr_party_data)
+    //console.log(metric)
+    return(curr_party_data)
+    
+    
+};
+
+function dropdown_party(csv_list, csv_data){
+    //console.log(csv_list)
+    //add a select element for the dropdown menu
+    var dd_party = d3.select("body")
+        .append("div")
+            .attr("class","dropdown") //for positioning menu with css
+            .html("<h3>Select a party:</h3>")
+        .append("select")
+    
+    dd_party
+        .on("change", function(){
+            //alert(d3.select(this).property("value"))
+            get_party_data(csv_data, d3.select(this).property("value"));
+        });
+        
+    dd_party.selectAll("options")
+        .data(csv_list)
+        .enter()
+            .append("option")
+            .attr("value", function(d){ return d.Party })
+            .text(function(d){ return d.Party })
+};    
+
+function dropdown_metric(){
+    //add a select element for the dropdown menu
+    var dd_metric = d3.select("body")
+        .append("div")
+        .attr("class","dd_metric") //for positioning menu with css
+        .html("<h3>Select metric:</h3>")
+        .append("select")
+    dd_metric
+        .on("change", function(){
+            update_fills(this.value);
+            //metric_to_district(curr_party_data, metric)
+        });
+
+    //create each option element within the dropdown
+    dd_metric.selectAll("options")
+        .data(metric_array)
+        .enter()
+            .append("option")
+            .attr("value", function(d){ return d })
+            .text(function(d) {return d.replace(/_/g,' ')});
+};
+
+function update_fills(attribute = metric){
+    //change the expressed attribute
+    metric = attribute;
+    
+    //recolor the map
+    d3.selectAll(".districts") //select every region
+        .style("fill", function(d) { //color enumeration units
+            return choropleth(d, colour_scale(curr_party_data)); //->
+        })
+        .select("desc") //replace the color text in each desc element
+            .text(function(d) {
+                return choropleth(d, colour_scale(curr_party_data)); //->
+        });
+};
+
+  //Adding mouseevents
+function over(d) {
+    d3.select(this).transition().duration(300).style("opacity", 1);
+    //div.transition().duration(300)
+    //.style("opacity", 1)
+    //div.text(nameById[d.properties.region] + " : " + rateById[d.properties.region])
+    //.style("left", (d3.event.pageX) + "px")
+    //.style("top", (d3.event.pageY -30) + "px");
+  };
+function out(d) {
+    d3.select(this)
+    .transition().duration(300)
+    .style("opacity", 0.8);
+    //div.transition().duration(300)
+    //.style("opacity", 0);
+  };
+
+
+function highlight(data){
+    // change opacity for mouseover
+    var props = data.properties; //json properties
+    var district = d3.select("#"+props.DISTRICT);
+    //district.style("opacity", 0.8)
+    district.style("fill", "#ffcc66"); //set the enumeration unit fill to black
+    
+    // build an info label div
+    // content
+    var head = "Proportional change in representation"
+    var party = "ANC"
+    var prov_name = props.PROVNAME
+    var dist_name = props.MUNICNAME
+    //var delta = (props[expressed] * 100).toFixed(2)
+    var labelAttribute = "<b>Party: " + party + "</b><br>" +
+        "<b>Province: " + prov_name + "</b><br>" +
+        "<b>Municipality/district: " + dist_name + "</b><br>" +
+        "<b>Change: " + /*delta +*/ "%</b>"; //label content
+
+    //create info label div
+    var infolabel = d3.select("body").append("div")
+        .attr("class", "infolabel") //for styling label
+        .attr("id", props.DISTRICT+"label") //for label div
+        .html(labelAttribute); //add text
+};
+
+function dehighlight(data){
+
+    //json or csv properties
+    var props = data.properties; //json properties
+    var district = d3.select("#"+props.DISTRICT);
+    //district.style("opacity", 1);
+    var fillcolor = district.select("desc").text(); //access original color from desc
+    district.style("fill", fillcolor); //set the enumeration unit fill to orig
+    
+    d3.select("#"+props.DISTRICT+"label").remove(); //remove info label
+};  
+
+function proj_vals(pstring){
+
+    function proj_val_stripper(val){
+        var start = pstring.indexOf(val) + 6;
+        var end = pstring.substr(start).indexOf(" ");
+        return(pstring.substr(start).substr(0,end));
+    }
+    var p1 = proj_val_stripper("lat_1");
+    var p2 = proj_val_stripper("lat_2");
+    var c = proj_val_stripper("lat_0");
+    var r = proj_val_stripper("lon_0");
+    
+    var p = [+p1, +p2];
+    var c = [0, +c];
+    var r = [(+r * (-1)) , +0];
+    
+    return {
+        p: p,
+        c: c,
+        r: r
+    };
+};   
+</script>
