@@ -1,0 +1,1 @@
+This is a small project I did before our South African local government elections in 2016. the final product is at https://philmassie.github.io/post/20160714/election_effort/
